@@ -42,7 +42,6 @@ AfterToolCall = Callable[
 
 
 # NOTE: 核心 agent loop，本身无状态，需要外部传入历史 messages
-# NOTE: 核心 agent loop
 async def run_agent_loop(
     *,
     provider: ModelProvider,
