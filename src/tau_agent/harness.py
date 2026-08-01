@@ -58,6 +58,7 @@ class SimpleCancellationToken:
         return self._cancelled
 
 
+# NOTE: 有状态的 agent harness 核心
 class AgentHarness:
     """Reusable stateful agent brain independent of coding/UI policy."""
 
@@ -207,6 +208,7 @@ class AgentHarness:
     def _drain_follow_up_messages(self) -> tuple[AgentMessage, ...]:
         return self._drain_queue(self._follow_up_queue)
 
+    # NOTE: 获取 pending prompt 时根据 queue_mode 判断是只取队头还是全部
     def _drain_queue(self, queue: deque[AgentMessage]) -> tuple[AgentMessage, ...]:
         if not queue:
             return ()
@@ -221,7 +223,9 @@ class AgentHarness:
         self._append_interrupted_tool_results()
         return len(self._messages) - before
 
+    # NOTE: 修复仅有 tool call 但没有 tool result 的不完整状态（补上缺少 result 的消息，填充为被用户中断）
     def _append_interrupted_tool_results(self) -> None:
+        # 有 tool call result 的 tool call ids
         returned_ids = {
             message.tool_call_id
             for message in self._messages
