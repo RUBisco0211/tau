@@ -90,6 +90,7 @@ class AssistantErrorEvent(WireModel):
     error: AssistantMessage
 
 
+# NOTE: 一次 llm 流式调用返回的生命周期事件
 type AssistantMessageEvent = Annotated[
     AssistantStartEvent
     | TextStartEvent

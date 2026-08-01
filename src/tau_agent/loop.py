@@ -41,14 +41,15 @@ AfterToolCall = Callable[
 ]
 
 
+# NOTE: 核心 agent loop
 async def run_agent_loop(
     *,
     provider: ModelProvider,
     model: str,
-    system: str,
-    messages: list[AgentMessage],
+    system: str,  # system prompt
+    messages: list[AgentMessage],  # 已有的 transcript，即当前 session 已有的历史记录
     tools: list[AgentTool],
-    prompts: Sequence[AgentMessage] = (),
+    prompts: Sequence[AgentMessage] = (),  # 新的 prompt
     max_turns: int | None = None,
     signal: CancellationToken | None = None,
     get_steering_messages: Callable[[], Sequence[AgentMessage]] | None = None,
@@ -84,11 +85,14 @@ async def run_agent_loop(
 
     while True:
         has_more_tools = True
+        # NOTE: 一次 agent 回复流程，反复调用 LLM 直到返回中不再包括 tool call 请求
+        # 注意 pending 为 steering 或 followup messages
         while has_more_tools or pending:
             if not first_turn:
                 yield TurnStartEvent()
             first_turn = False
 
+            # NOTE: 此时 pending 的是 steering messages，即在将来最近的一个 turn 完成之后立即进行
             for message in pending:
                 messages.append(message)
                 new_messages.append(message)
@@ -96,6 +100,7 @@ async def run_agent_loop(
                 yield MessageEndEvent(message=message)
             pending = ()
 
+            # NOTE: 防止模型无限推理：当前 turn 数大于预设的最大 turn 数量时给出提示并提前结束当前回复过程
             if max_turns is not None and turn > max_turns:
                 error = _error_message(model, f"Agent stopped after max_turns={max_turns}")
                 messages.append(error)
@@ -106,6 +111,7 @@ async def run_agent_loop(
                 yield AgentEndEvent(messages=new_messages)
                 return
 
+            # NOTE: 开启一次 llm 调用
             # Python async generators cannot pass a yielding callback through a
             # normal await cleanly, so consume the assistant sub-generator and
             # retain its final message through the terminal event.
@@ -136,9 +142,11 @@ async def run_agent_loop(
                 yield AgentEndEvent(messages=new_messages)
                 return
 
+            # NOTE: 获取一次 llm 调用结果后，获取其中 tool call 请求
             tool_results: list[ToolResultMessage] = []
             calls = list(assistant.tool_calls)
             has_more_tools = bool(calls)
+            # NOTE: 执行 tool calls
             for call in calls:
                 async for event in _execute_tool_call(
                     call,
@@ -148,6 +156,7 @@ async def run_agent_loop(
                     after_tool_call,
                 ):
                     yield event
+                    # NOTE: tool call 结果也加入 message
                     if isinstance(event, MessageEndEvent) and isinstance(
                         event.message, ToolResultMessage
                     ):
@@ -157,8 +166,10 @@ async def run_agent_loop(
 
             yield TurnEndEvent(message=assistant, tool_results=tool_results)
             turn += 1
+            # NOTE: 每个 turn 结束后重新获取已有的 steering prompt（steering 的需要在未来最近一个 turn 结束后立即发送）
             pending = tuple(get_steering_messages() if get_steering_messages else ())
 
+        # NOTE: followup 的 prompt 只会在 agent 一次回复完成之后再获取，开启下一个完整请求流程
         follow_ups = tuple(get_follow_up_messages() if get_follow_up_messages else ())
         if follow_ups:
             pending = follow_ups
@@ -195,6 +206,7 @@ async def _assistant_events(
     tools: list[AgentTool],
     signal: CancellationToken | None,
 ) -> AsyncIterator[AgentEvent]:
+    # NOTE: 一次 llm 调用（一个 turn）
     source: AsyncIterator[AssistantMessageEvent] = provider.stream_response(
         model=model,
         system=system,
@@ -237,6 +249,7 @@ async def _execute_tool_call(
 
     blocked = False
     block_reason: str | None = None
+    # NOTE: tool call 执行前拦截器，可阻塞
     if before_tool_call is not None:
         blocked, block_reason = await before_tool_call(call)
 
@@ -253,6 +266,7 @@ async def _execute_tool_call(
             is_error = True
         else:
             result, is_error, updates = await _run_tool(tool, call, signal)
+            # NOTE: updates 为 tool call 部分中间过程可触发的事件
             for update in updates:
                 yield ToolExecutionUpdateEvent(
                     tool_call_id=call.id,
