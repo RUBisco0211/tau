@@ -93,7 +93,6 @@ async def run_agent_loop(
             first_turn = False
 
             # NOTE: 此时 pending 的是 steering messages，即在将来最近的一个 turn 完成之后立即进行
-            # NOTE: 此时 pending 的是 steering messages，即在将来最近的一个 turn 完成之后立即进行
             for message in pending:
                 messages.append(message)
                 new_messages.append(message)
@@ -102,7 +101,6 @@ async def run_agent_loop(
             pending = ()
 
             # NOTE: 防止模型无限推理：当前 turn 数大于预设的最大 turn 数量时给出错误信息并提前结束当前回复过程
-            # NOTE: 防止模型无限推理：当前 turn 数大于预设的最大 turn 数量时给出提示并提前结束当前回复过程
             if max_turns is not None and turn > max_turns:
                 error = _error_message(model, f"Agent stopped after max_turns={max_turns}")
                 messages.append(error)
