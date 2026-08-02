@@ -161,6 +161,7 @@ DEFAULT_READ_OPERATIONS = ReadOperations(
 )
 
 
+# NOTE: 可用 tools：read，write，edit，bash
 def create_coding_tools(
     *,
     cwd: str | Path | None = None,
