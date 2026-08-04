@@ -31,6 +31,7 @@ SUMMARIZATION_SYSTEM_PROMPT = (
     "conversation. ONLY output the structured summary."
 )
 
+# NOTE: 首次压缩使用的 prompt
 SUMMARIZATION_PROMPT = (
     "The messages above are a conversation to summarize. Create a structured context "
     "checkpoint summary that another LLM will use to continue the work.\n\n"
@@ -59,6 +60,7 @@ SUMMARIZATION_PROMPT = (
     "messages."
 )
 
+# NOTE: 第二次及以后压缩 prompt，需要把新的压缩内容并入到最开始的压缩内容中
 UPDATE_SUMMARIZATION_PROMPT = (
     "The messages above are NEW conversation messages to incorporate into the existing "
     "summary provided in <previous-summary> tags.\n\n"
@@ -201,13 +203,17 @@ def summarize_messages_for_compaction(messages: tuple[AgentMessage, ...]) -> str
     return "\n".join(lines)
 
 
+# NOTE: 构建用于压缩的完整 prompt
 def build_compaction_summary_prompt(
     messages: tuple[AgentMessage, ...],
     *,
     custom_instructions: str | None = None,
 ) -> str:
     """Build the model prompt Tau uses to summarize compacted history."""
+    # 分离之前的压缩 summary 和之后的完整消息
     previous_summary, new_messages = _split_previous_compaction_summary(messages)
+
+    # 把要压缩的消息序列化为结构化的多行 xml 标签
     conversation = serialize_messages_for_compaction(new_messages)
     prompt = f"<conversation>\n{conversation}\n</conversation>\n\n"
     base_prompt = (
@@ -224,6 +230,7 @@ def build_compaction_summary_prompt(
     return f"{prompt}{base_prompt}"
 
 
+# NOTE: 把要压缩的消息序列化为结构化的多行 xml 标签
 def serialize_messages_for_compaction(messages: tuple[AgentMessage, ...]) -> str:
     """Serialize provider-neutral messages for the compaction summarizer."""
     if not messages:
@@ -265,12 +272,14 @@ def _truncate_summary_text(text: str) -> str:
     return collapsed[: SUMMARY_MESSAGE_CHAR_LIMIT - 3].rstrip() + "..."
 
 
+# NOTE: 分离出之前的 compaction summary 和之后的完整 message
 def _split_previous_compaction_summary(
     messages: tuple[AgentMessage, ...],
 ) -> tuple[str | None, tuple[AgentMessage, ...]]:
     if not messages:
         return None, messages
 
+    # NOTE: 之前的 compaction summary 是作为 UserMessage 发送的，且使用特定 prefix “Previous conversation summary:\n”
     first = messages[0]
     if not isinstance(first, UserMessage):
         return None, messages

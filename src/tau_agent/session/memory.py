@@ -103,6 +103,7 @@ class SessionState:
         )
 
 
+# NOTE: 应用上下文压缩
 def _apply_compaction(
     message_rows: list[tuple[str, AgentMessage]],
     entry: CompactionEntry,
@@ -110,6 +111,7 @@ def _apply_compaction(
     replaced_ids = set(entry.replaces_entry_ids)
     retained: list[tuple[str, AgentMessage]] = []
     inserted_summary = False
+    # NOTE: 只把压缩后的 summary message 插入一次，且保留最近的无需压缩的 message
     for entry_id, message in message_rows:
         if entry_id not in replaced_ids:
             retained.append((entry_id, message))

@@ -1428,6 +1428,7 @@ class CodingSession:
         self._extension_runtime.attach_harness_listener(self._harness.subscribe)
         await self._extension_runtime.emit_session_start(reason)
 
+    # NOTE: 手动触发压缩，压缩所有消息
     async def compact(self, instructions: str | None = None) -> str:
         """Generate a manual compaction summary and rebuild active context."""
         plan = self._manual_compaction_plan()
@@ -1472,6 +1473,7 @@ class CodingSession:
         self._config = replace(self._config, index_on_first_persist=False)
         self._ensure_session_file_initialized()
 
+    # NOTE: 扩展 prompt
     def expand_prompt_text(self, text: str) -> str:
         """Expand prompt text using loaded markdown resources."""
         expanded_prompt = expand_prompt_template_command(text, self._prompt_templates)
@@ -1522,6 +1524,7 @@ class CodingSession:
             added_to_context=add_to_context,
         )
 
+    # NOTE: coding agent 的 agent loop 入口
     async def prompt(
         self,
         content: str,
@@ -1539,6 +1542,7 @@ class CodingSession:
         initiated the turn for the `input` hook (``"extension"`` when an
         extension started it, ``"interactive"`` otherwise).
         """
+        # provider, model, cwd, session_id, run_id
         context = self._diagnostic_context()
         input_outcome = await self._extension_runtime.run_input_hooks(
             content, source=source, streaming_behavior=streaming_behavior
@@ -1876,6 +1880,7 @@ class CodingSession:
             )
             return False
 
+    # NOTE: 压缩溢出消息
     async def _try_overflow_compact(
         self,
         *,
@@ -1994,6 +1999,7 @@ class CodingSession:
         await self._append_compaction(summary, replace_entry_ids=plan.replace_entry_ids)
         return True
 
+    # NOTE: 生成压缩摘要
     async def _generate_compaction_summary(
         self,
         messages: tuple[AgentMessage, ...],
@@ -2078,6 +2084,7 @@ class CodingSession:
     def _active_context_rows(self) -> tuple[tuple[str, AgentMessage], ...]:
         return tuple(zip(self._state.context_entry_ids, self._state.messages, strict=True))
 
+    # NOTE: 压缩后的 summary 存入 session tree
     async def _append_compaction(
         self,
         summary: str,
